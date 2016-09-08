@@ -1,5 +1,7 @@
-# start flask locally
+# local specific files
 start_flask.sh
+do_tests.sh
+test.db*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
