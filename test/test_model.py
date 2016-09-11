@@ -215,3 +215,16 @@ class TestStringMethods(unittest.TestCase):
 			compute_tenants_credits('Dorighello'),
 			{tenant1: 6, tenant2: -3, tenant3: -3}
 		)
+
+	def test_password_encryption(self):
+		session.query(User).all()
+		user = User(username='root', password='password')
+		session.add(user)
+		session.commit()
+
+		from sqlalchemy_utils.types.password import Password
+		self.assertTrue(isinstance(user.password, Password))
+		self.assertEqual(user.password, 'password')
+
+		# delete user
+		session.delete(user)

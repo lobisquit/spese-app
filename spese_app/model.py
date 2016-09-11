@@ -2,7 +2,10 @@ import datetime
 import os
 from collections import OrderedDict
 
-from sqlalchemy import create_engine, Table, Column, ForeignKey, Integer, String, DateTime, Float, Boolean
+from sqlalchemy_utils.types.password import PasswordType
+from bcrypt import gensalt, hashpw
+
+from sqlalchemy import *
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 
@@ -76,7 +79,7 @@ class User(MyMixin, Base, UserMixin):
 	id = Column(Integer, primary_key=True)
 	apartment = Column(String)
 	username = Column(String, nullable=False)
-	password = Column(String, nullable=False)
+	password = Column(PasswordType(schemes=['bcrypt']))
 
 	role_id = Column(Integer, ForeignKey('roles.id'))
 	role = relationship('Role')
@@ -87,7 +90,7 @@ class User(MyMixin, Base, UserMixin):
 		'polymorphic_identity':'user'
 	}
 
-	def __init__(self, role=None, **kwargs):
+	def __init__(self, role=None, password=None, **kwargs):
 		"""
 			Available arguments are these:
 				- role, a model.Role object
@@ -97,9 +100,8 @@ class User(MyMixin, Base, UserMixin):
 		"""
 		if role is None:
 			# if no role is set, guess it via username (else fail)
-			role = session.query(Role).filter(
-				Role.name==kwargs['username']
-			).one()
+			role = session.query(Role).filter(Role.name==kwargs['username']).one()
+		self.password = password
 		super().__init__(role=role, **kwargs)
 
 	def desc(self):
@@ -155,10 +157,7 @@ class Tenant(User):
 
 	def __str__(self):
 		return '{} {}'.format(self.name, self.surname)
-
-	def __hash__(self):
-		return self.id
-
+		
 
 class Expense(MyMixin, Base):
 	"""
