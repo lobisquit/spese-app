@@ -1,0 +1,42 @@
+{% macro head_details(title) %}
+	<title>{{ title }}</title>
+	<link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/style.css') }}">
+	<link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
+{% endmacro %}
+
+{% macro display_bars(title, current_user) %}
+	<div id="title">
+		<p>{{ title }}</p>
+	</div>
+	<!-- <div id="sidebar">
+		<img tabindex=1000 id="trigger-image" src="{{ url_for('static', filename='images/menu.png') }}">
+		<ul>
+			<a href="main_page"><li>Home</li></a>
+			<a href="add_expense"><li>Aggiungi spesa</li></a>
+			<a href="recap"><li>Riepilogo</li></a>
+			<a href="logout"><li>Logout</li></a>
+			{% if current_user.username == 'admin' %}
+				<hr>
+				<a href="add_tenant"><li>Aggiungi inquilino</li></a>
+				<a href="remove_tenant"><li>Rimuovi inquilino</li></a>
+			{% endif %}
+		</ul>
+	</div> -->
+{% endmacro %}
+
+{% macro render_field(field, show_label=True) %}
+	<div class="form_item">
+		{% if show_label %}
+			{{ field.label }}<br>
+		{% endif %}
+		{{ field(**kwargs)|safe }}
+		{# report field errors #}
+		{% if field.errors %}
+			<ul class=errors>
+			{% for error in field.errors %}
+				<li>{{ error }}</li>
+			{% endfor %}
+			</ul>
+		{% endif %}
+	</div>
+{% endmacro %}

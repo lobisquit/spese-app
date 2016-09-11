@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	{% set title = "Pagina di accesso" %}
+	{% from "_template_helpers.html" import display_bars, render_field, head_details %}
+	{{ head_details(title) }}
+</head>
+
+<body>
+	{{ display_bars(title, current_user) }}
+	<form action="/login" method=post>
+		<!-- {{ form.csrf_token }} -->
+		{{ render_field(form.username) }}
+		{{ render_field(form.password) }}
+		{{ render_field(form.login_button, show_label=False) }}
+	</form>
+	<p> Current user is: "{{ current_user }}" <p>
+	<p> {{ current_user.is_anonymous }} <p>
+	<!-- <img id="trigger-image" src="{{ url_for('static', filename='images/bender-blackjack.jpg') }}"> -->
+
+	{% with messages = get_flashed_messages() %}
+		{% if messages %}
+		<ul class=flashes>
+			{% for message in messages %}
+				<li>{{ message | safe }}<li>
+			{% endfor %}
+		</ul>
+		{% endif %}
+	{% endwith %}
+</body>
