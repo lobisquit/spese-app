@@ -11,7 +11,8 @@ from sqlalchemy.orm import sessionmaker, relationship
 
 from flask_login import UserMixin
 
-__all__ = ['Role', 'User', 'Tenant', 'Expense', 'session', 'compute_tenants_credits', 'compute_total_expenses']
+__all__ = ['Role', 'User', 'Tenant', 'Expense', 'session',
+	'compute_tenants_credits', 'compute_total_expenses', 'authenticate_user']
 
 # read configuration from environment variable to connect db
 engine = create_engine(os.environ['POSTGRE_DB'])
@@ -96,7 +97,7 @@ class User(MyMixin, Base, UserMixin):
 				- role, a model.Role object
 				- apartment, as a string
 				- username
-				- password
+				# - password
 		"""
 		if role is None:
 			# if no role is set, guess it via username (else fail)
@@ -108,7 +109,8 @@ class User(MyMixin, Base, UserMixin):
 		return {
 			'id': self.id,
 			'username': self.username,
-			'password': self.password,
+			# displaying a Password object is meaningless
+			'password': '***',
 			'apartment': self.apartment,
 			'role': self.role
 		}
@@ -157,7 +159,7 @@ class Tenant(User):
 
 	def __str__(self):
 		return '{} {}'.format(self.name, self.surname)
-		
+
 
 class Expense(MyMixin, Base):
 	"""
@@ -208,7 +210,7 @@ class Expense(MyMixin, Base):
 Base.metadata.create_all(engine)
 
 # populate roles in there is none
-if session.query(Role).count() is 0:
+if session.query(Role).count() == 0:
 	default_roles = [
 		Role('root'),
 		Role('admin'),
@@ -247,3 +249,22 @@ def compute_total_expenses(apartment):
 	for expense in session.query(Expense).join(Tenant).filter(Tenant.apartment==apartment):
 		total += expense.amount
 	return total
+
+def authenticate_user(apartment=None, username=None, password=None):
+	# special handle for root, that has no apartment
+	if username=='root' and apartment=="":
+		# note that "root" is unique and always present
+		root = session.query(User).filter(User.username == 'root').one()
+		if root.password == password:
+			return root
+	else:
+		# handle common users (related to an apartment)
+		# note that (username, apartment) is unique in database
+		user = session.query(User).filter(
+			User.username == username,
+			User.apartment == apartment
+		).one_or_none()
+		# verify that such user exists too, i.e. it is not None
+		if user and user.password == form.password.data:
+			return user
+	return None
