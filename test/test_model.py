@@ -13,10 +13,9 @@ class TestStringMethods(unittest.TestCase):
 		session.rollback()
 		engine.dispose()
 
-	def test_role_initialization(self):
-		self.assertNotEqual(session.query(Role).all(), 0)
-
 	def test_is_tenant(self):
+		session.add(Apartment(name='Dorighello'))
+
 		user = User(
 			apartment='Dorighello',
 			username='admin',
@@ -32,6 +31,8 @@ class TestStringMethods(unittest.TestCase):
 		self.assertFalse(user.is_tenant())
 
 	def test_user_not_in_db_before_session_add(self):
+		session.add(Apartment(name='Dorighello'))
+
 		prev_number = session.query(User).count()
 		tenant = Tenant(
 			apartment='Dorighello',
@@ -43,6 +44,8 @@ class TestStringMethods(unittest.TestCase):
 		self.assertEqual(prev_number, after_number)
 
 	def test_expense_not_in_db_before_session_add(self):
+		session.add(Apartment(name='Dorighello'))
+
 		prev_number = session.query(User).count()
 		tenant = Tenant(
 			apartment='Dorighello',
@@ -54,6 +57,8 @@ class TestStringMethods(unittest.TestCase):
 		self.assertEqual(prev_number, after_number)
 
 	def test_add_tenant(self):
+		session.add(Apartment(name='Dorighello'))
+
 		tenant = Tenant(
 			apartment='Dorighello',
 			username='enrico',
@@ -66,13 +71,15 @@ class TestStringMethods(unittest.TestCase):
 		session.delete(tenant)
 
 	def test_add_expense(self):
+		session.add(Apartment(name='Dorighello'))
+
 		tenant = Tenant(
 			apartment='Dorighello',
 			username='enrico',
 			password='password',
 			real_name='Enrico'
 		)
-		expense = Expense(tenant, 10)
+		expense = Expense(payer=tenant, amount=10)
 		session.add(expense)
 		session.flush()
 		assert session.query(Expense).get(expense.id) is not None
@@ -80,6 +87,8 @@ class TestStringMethods(unittest.TestCase):
 		session.delete(tenant)
 
 	def test_expense_disappear_when_its_payer_is_deleted(self):
+		session.add(Apartment(name='Dorighello'))
+
 		# behaviour obtained adding 'cascade="all"' to expenses_as_buyer in Tenant
 		tenant = Tenant(
 			apartment='Dorighello',
@@ -87,7 +96,7 @@ class TestStringMethods(unittest.TestCase):
 			password='password',
 			real_name='Enrico'
 		)
-		expense = Expense(tenant, 10)
+		expense = Expense(payer=tenant, amount=10)
 		session.add(tenant)
 		session.add(expense)
 		session.flush()
@@ -100,6 +109,9 @@ class TestStringMethods(unittest.TestCase):
 		assert session.query(Expense).get(expense_id) is None
 
 	def test_append_involved_tenants(self):
+		session.add(Apartment(name='Dorighello'))
+		session.add(Apartment(name='Portello'))
+
 		tenant1 = Tenant(
 			apartment='Dorighello',
 			username='enrico',
@@ -130,6 +142,8 @@ class TestStringMethods(unittest.TestCase):
 		session.delete(tenant2)
 
 	def test_compute_credits_all_involved(self):
+		session.add(Apartment(name='Dorighello'))
+
 		tenant1 = Tenant(apartment='Dorighello', username='enrico',
 			password='password', real_name='')
 		tenant2 = Tenant(apartment='Dorighello', username='pippo',
@@ -141,7 +155,7 @@ class TestStringMethods(unittest.TestCase):
 		session.add(tenant2)
 		session.add(tenant3)
 
-		expense = Expense(tenant1, 9)
+		expense = Expense(payer=tenant1, amount=9)
 		session.add(expense)
 		session.flush()
 
@@ -151,6 +165,8 @@ class TestStringMethods(unittest.TestCase):
 		)
 
 	def test_compute_credits_not_payer_not_involved(self):
+		session.add(Apartment(name='Dorighello'))
+
 		tenant1 = Tenant(apartment='Dorighello', username='enrico',
 			password='password', real_name='')
 		tenant2 = Tenant(apartment='Dorighello', username='pippo',
@@ -162,7 +178,7 @@ class TestStringMethods(unittest.TestCase):
 		session.add(tenant2)
 		session.add(tenant3)
 
-		expense = Expense(tenant1, 10, involved_tenants=[tenant1, tenant2])
+		expense = Expense(payer=tenant1, amount=10, involved_tenants=[tenant1, tenant2])
 		session.add(expense)
 		session.flush()
 
@@ -172,6 +188,8 @@ class TestStringMethods(unittest.TestCase):
 		)
 
 	def test_compute_credits_payer_non_involved(self):
+		session.add(Apartment(name='Dorighello'))
+
 		tenant1 = Tenant(apartment='Dorighello', username='enrico',
 			password='password', real_name='')
 		tenant2 = Tenant(apartment='Dorighello', username='pippo',
@@ -183,7 +201,7 @@ class TestStringMethods(unittest.TestCase):
 		session.add(tenant2)
 		session.add(tenant3)
 
-		expense = Expense(tenant1, 9, involved_tenants=[tenant2, tenant3])
+		expense = Expense(payer=tenant1, amount=9, involved_tenants=[tenant2, tenant3])
 		session.add(expense)
 		session.flush()
 
@@ -193,6 +211,9 @@ class TestStringMethods(unittest.TestCase):
 		)
 
 	def test_compute_credits_with_other_apartments_tenants(self):
+		session.add(Apartment(name='Dorighello'))
+		session.add(Apartment(name='Portello'))
+
 		tenant1 = Tenant(apartment='Dorighello', username='enrico',
 			password='password', real_name='')
 		tenant2 = Tenant(apartment='Dorighello', username='pippo',
@@ -207,8 +228,8 @@ class TestStringMethods(unittest.TestCase):
 		session.add(tenant3)
 		session.add(alien_tenant)
 
-		session.add(Expense(tenant1, 9))
-		session.add(Expense(alien_tenant, 10))
+		session.add(Expense(payer=tenant1, amount=9))
+		session.add(Expense(payer=alien_tenant, amount=10))
 		session.flush()
 
 		self.assertEqual(

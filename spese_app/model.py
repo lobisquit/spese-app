@@ -11,7 +11,7 @@ from sqlalchemy.orm import sessionmaker, relationship
 
 from flask_login import UserMixin
 
-__all__ = ['Role', 'User', 'Tenant', 'Expense', 'session',
+__all__ = ['Apartment', 'User', 'Tenant', 'Expense', 'session',
 	'compute_tenants_credits', 'compute_total_expenses', 'authenticate_user']
 
 # read configuration from environment variable to connect db
@@ -49,28 +49,17 @@ class MyMixin():
 			', '.join(attributes)
 		)
 
-
-class Role(Base, MyMixin):
+class Apartment(MyMixin, Base):
 	"""
-		Define basic role of access
+		Describe apartment with admin, trusted_user and tenants
 	"""
-	__tablename__ = 'roles'
+	__tablename__ = 'apartments'
 	id = Column(Integer, primary_key=True)
 	name = Column(String, unique=True)
-	users = relationship('User', back_populates='role')
-
-	def __init__(self, name):
-		self.name = name
+	users = relationship('User')
 
 	def desc(self):
 		return {'name': self.name}
-
-	def __str__(self):
-		return self.name
-
-	def __hash__(self):
-		return hash(self.name)
-
 
 class User(MyMixin, Base, UserMixin):
 	"""
@@ -78,12 +67,13 @@ class User(MyMixin, Base, UserMixin):
 	"""
 	__tablename__ = 'users'
 	id = Column(Integer, primary_key=True)
-	apartment = Column(String)
-	username = Column(String, nullable=False)
-	password = Column(PasswordType(schemes=['bcrypt']))
+	apartment = relationship('Apartment')
+	apartment_id = Column(Integer, ForeignKey('apartments.id'))
 
-	role_id = Column(Integer, ForeignKey('roles.id'))
-	role = relationship('Role')
+	username = Column(String, nullable=False)
+	real_name = Column(String, nullable=True)
+	password = Column(PasswordType(schemes=['bcrypt']))
+	UniqueConstraint('username', 'apartment_id')
 
 	type = Column(String)
 	__mapper_args__ = {
@@ -91,28 +81,21 @@ class User(MyMixin, Base, UserMixin):
 		'polymorphic_identity':'user'
 	}
 
-	def __init__(self, role=None, password=None, **kwargs):
-		"""
-			Available arguments are these:
-				- role, a model.Role object
-				- apartment, as a string
-				- username
-				# - password
-		"""
-		if role is None:
-			# if no role is set, guess it via username (else fail)
-			role = session.query(Role).filter(Role.name==kwargs['username']).one()
-		self.password = password
-		super().__init__(role=role, **kwargs)
+	def __init__(self, apartment=None, **kwargs):
+		# fetch proper object if just name is given
+		if isinstance(apartment, str):
+			apartment = session.query(Apartment).filter(
+				Apartment.name==apartment
+			).one()
+		super().__init__(apartment=apartment, **kwargs)
 
 	def desc(self):
 		return {
 			'id': self.id,
 			'username': self.username,
-			# displaying a Password object is meaningless
-			'password': '***',
-			'apartment': self.apartment,
-			'role': self.role
+			'real_name': self.real_name,
+			'password': '***', # displaying a Password object is not useful
+			'apartment': self.apartment
 		}
 
 	def is_tenant(self):
@@ -128,8 +111,6 @@ class Tenant(User):
 	"""
 	__tablename__ = 'tenants'
 	id = Column(Integer, ForeignKey('users.id'), primary_key=True)
-	real_name = Column(String, nullable=False)
-
 	expenses_as_buyer = relationship('Expense', back_populates='payer', cascade='all')
 	expenses_as_involved = relationship(
 		'Expense',
@@ -141,24 +122,14 @@ class Tenant(User):
 		'polymorphic_identity':'tenant'
 	}
 
-	def __init__(self, real_name=None, **kwargs):
-		"""
-			Available arguments are these:
-				- role, a model.Role object
-				- apartment, as a string
-				- username
-				- password
-				- real user name
-		"""
-		tenant_role = session.query(Role).filter(Role.name=='tenant').one()
-		super().__init__(role=tenant_role, **kwargs)
-		self.real_name = real_name
-
 	def desc(self):
 		return dict(super().desc(), **{'real_name': self.real_name})
 
 	def __str__(self):
-		return '{} {}'.format(self.name, self.surname)
+		if real_name is None:
+			return self.username
+		else:
+			return self.real_name
 
 
 class Expense(MyMixin, Base):
@@ -174,27 +145,22 @@ class Expense(MyMixin, Base):
 	payer = relationship('Tenant')
 	involved_tenants = relationship('Tenant', secondary=involved_tenants_expense)
 
-	def __init__(self, payer, amount, date_time=None, involved_tenants=None):
+	def __init__(self, date_time=None, involved_tenants=None, **kwargs):
 		"""
 			If None, date_time is set to now
 			If None, involved_tenants is set to all tenants of payer's apartment
 		"""
-		self.payer = payer
-		self.amount = amount
-
 		# set current if no date & time is given
 		if date_time is None:
-			self.date_time = datetime.datetime.now()
-		else:
-			self.date_time = date_time
+			date_time = datetime.datetime.now()
 
 		# if list of involved is not set, add all, else follow parameter
 		if involved_tenants is None:
-			for tenant in session.query(Tenant).filter(Tenant.apartment==payer.apartment):
-				self.involved_tenants.append(tenant)
-		else:
-			for involved_tenant in involved_tenants:
-				self.involved_tenants.append(involved_tenant)
+			involved_tenants = []
+			for tenant in session.query(Tenant).filter(Tenant.apartment==kwargs['payer'].apartment):
+				involved_tenants.append(tenant)
+
+		super().__init__(date_time=date_time, involved_tenants=involved_tenants, **kwargs)
 
 	def desc(self):
 		return {
@@ -209,27 +175,17 @@ class Expense(MyMixin, Base):
 # create all required tables according to classes before
 Base.metadata.create_all(engine)
 
-# populate roles in there is none
-if session.query(Role).count() == 0:
-	default_roles = [
-		Role('root'),
-		Role('admin'),
-		Role('trusted_user'),
-		Role('tenant')
-	]
-	session.add_all(default_roles)
-	session.commit()
 
 def compute_tenants_credits(apartment):
 	"""
 		Compute financial situation of given apartment according to expenses in database
 	"""
 	# get all Tenants of given apartment
-	tenants = session.query(Tenant).filter(Tenant.apartment==apartment).order_by(Tenant.id)
+	tenants = session.query(Tenant).join(Apartment).filter(Apartment.name==apartment).order_by(Tenant.id)
 	credits = OrderedDict(zip(tenants, [0] * tenants.count()))
 
 	# get all Expenses referring to tenants of given apartment
-	for expense in session.query(Expense).join(Tenant).filter(Tenant.apartment==apartment):
+	for expense in session.query(Expense).join(Tenant).join(Apartment).filter(Apartment.name==apartment):
 		payer = expense.payer
 		involved = expense.involved_tenants
 
@@ -246,7 +202,7 @@ def compute_total_expenses(apartment):
 	""" Get sum of all expenses for given apartment """
 	total = 0
 	# get all Expenses referring to tenants of given apartment
-	for expense in session.query(Expense).join(Tenant).filter(Tenant.apartment==apartment):
+	for expense in session.query(Expense).join(Tenant).join(Apartment).filter(Apartment.name==apartment):
 		total += expense.amount
 	return total
 
