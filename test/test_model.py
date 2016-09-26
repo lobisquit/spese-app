@@ -4,7 +4,6 @@ from spese_app.model import *
 from spese_app.model import engine, Session
 
 class TestStringMethods(unittest.TestCase):
-
 	def setUp(self):
 		session = Session()
 		session.begin_nested()
@@ -239,7 +238,7 @@ class TestStringMethods(unittest.TestCase):
 
 	def test_password_encryption(self):
 		session.query(User).all()
-		user = User(username='root', password='password')
+		user = User(username='test', password='password')
 		session.add(user)
 		session.commit()
 
@@ -249,3 +248,15 @@ class TestStringMethods(unittest.TestCase):
 
 		# delete user
 		session.delete(user)
+
+	def test_user_authentication(self):
+		session.add(Apartment(name='posto'))
+		session.add(User(apartment='posto', username='admin', password='password'))
+
+		self.assertTrue(authenticate_user(apartment='posto', username='admin', password='password'))
+		self.assertFalse(authenticate_user(apartment='other', username='admin', password='password'))
+		self.assertFalse(authenticate_user(apartment='posto', username='wrong', password='password'))
+		self.assertFalse(authenticate_user(apartment='posto', username='admin', password='wrong_password'))
+		
+		session.add(User(username='root', password='password'))
+		self.assertTrue(authenticate_user(username='root', password='password'))

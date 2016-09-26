@@ -208,12 +208,13 @@ def compute_total_expenses(apartment):
 
 def authenticate_user(apartment=None, username=None, password=None):
 	# special handle for root, that has no apartment
-	if username=='root' and apartment=="":
+	if username=='root' and apartment==None:
 		# note that "root" is unique and always present
 		root = session.query(User).filter(User.username == 'root').one()
 		if root.password == password:
 			return root
 	else:
+		apartment = session.query(Apartment).filter(Apartment.name==apartment).one_or_none()
 		# handle common users (related to an apartment)
 		# note that (username, apartment) is unique in database
 		user = session.query(User).filter(
@@ -221,6 +222,6 @@ def authenticate_user(apartment=None, username=None, password=None):
 			User.apartment == apartment
 		).one_or_none()
 		# verify that such user exists too, i.e. it is not None
-		if user and user.password == form.password.data:
+		if user and user.password == password:
 			return user
 	return None
