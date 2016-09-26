@@ -61,6 +61,16 @@ class Apartment(MyMixin, Base):
 	def desc(self):
 		return {'name': self.name}
 
+	@property
+	def admin(self):
+		# admin uniqueness across apartments is guaranteed in User class
+		return next(user for user in self.users if user.username=='admin') if any(self.users) else None
+
+	@property
+	def trusted_user(self):
+		# trusted_user uniqueness across apartments is guaranteed in User class
+		return next(user for user in self.users if user.username=='trusted_user') if any(self.users) else None
+
 class User(MyMixin, Base, UserMixin):
 	"""
 		Object describing a user of the system, even non tenant ones
@@ -73,7 +83,7 @@ class User(MyMixin, Base, UserMixin):
 	username = Column(String, nullable=False)
 	real_name = Column(String, nullable=True)
 	password = Column(PasswordType(schemes=['bcrypt']))
-	UniqueConstraint('username', 'apartment_id')
+	__table_args__ = (UniqueConstraint('username', 'apartment_id'), )
 
 	type = Column(String)
 	__mapper_args__ = {
@@ -208,7 +218,7 @@ def compute_total_expenses(apartment):
 
 def authenticate_user(apartment=None, username=None, password=None):
 	# special handle for root, that has no apartment
-	if username=='root' and apartment==None:
+	if username=='root' and (apartment==None or apartment==''):
 		# note that "root" is unique and always present
 		root = session.query(User).filter(User.username == 'root').one()
 		if root.password == password:
