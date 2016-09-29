@@ -240,7 +240,8 @@ class TestStringMethods(unittest.TestCase):
 		session.query(User).all()
 		user = User(username='test', password='password')
 		session.add(user)
-		session.commit()
+		# session.commit()
+		session.flush()
 
 		from sqlalchemy_utils.types.password import Password
 		self.assertTrue(isinstance(user.password, Password))

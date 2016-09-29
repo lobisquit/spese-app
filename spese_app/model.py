@@ -3,6 +3,7 @@ import os
 from collections import OrderedDict
 
 from sqlalchemy_utils.types.password import PasswordType
+from sqlalchemy_utils import force_auto_coercion
 from bcrypt import gensalt, hashpw
 
 from sqlalchemy import *
@@ -185,6 +186,9 @@ class Expense(MyMixin, Base):
 # create all required tables according to classes before
 Base.metadata.create_all(engine)
 
+# set listener that coerce every properties of mapped objects
+# see https://sqlalchemy-utils.readthedocs.io/en/latest/listeners.html
+force_auto_coercion()
 
 def compute_tenants_credits(apartment):
 	"""
