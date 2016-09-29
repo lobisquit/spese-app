@@ -257,6 +257,33 @@ class TestStringMethods(unittest.TestCase):
 		self.assertFalse(authenticate_user(apartment='other', username='admin', password='password'))
 		self.assertFalse(authenticate_user(apartment='posto', username='wrong', password='password'))
 		self.assertFalse(authenticate_user(apartment='posto', username='admin', password='wrong_password'))
-		
+
 		session.add(User(username='root', password='password'))
 		self.assertTrue(authenticate_user(username='root', password='password'))
+
+	def test_expense_and_tenants_deleted_when_apartment_deleted(self):
+		apart = Apartment(name='Dorighello')
+		session.add(apart)
+
+		# behaviour obtained adding 'cascade="all"' to expenses_as_buyer in Tenant
+		tenant = Tenant(
+			apartment='Dorighello',
+			username='enrico',
+			password='password',
+			real_name='Enrico'
+		)
+		expense = Expense(payer=tenant, amount=10)
+		session.add(tenant)
+		session.add(expense)
+		session.flush()
+
+		# save ids for testing
+		expense_id = expense.id
+		tenant_id = tenant.id
+
+		# delete apartment and check cascade delete
+		session.delete(apart)
+		session.flush()
+
+		assert session.query(Expense).get(expense_id) is None
+		assert session.query(Tenant).get(tenant_id) is None

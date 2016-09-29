@@ -56,7 +56,7 @@ class Apartment(MyMixin, Base):
 	__tablename__ = 'apartments'
 	id = Column(Integer, primary_key=True)
 	name = Column(String, unique=True)
-	users = relationship('User')
+	users = relationship('User', cascade='all')
 
 	def desc(self):
 		return {'name': self.name}
